@@ -1,1 +1,55 @@
-# NGINX
+# NGINX Configuration
+## NGINX File
+
+<details>
+  <summary>NGINX File which has been configured and the parameters explained below</summary>
+
+```nginx
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log;
+pid /run/nginx.pid;
+
+# Load dynamic modules. See /usr/share/nginx/README.dynamic.
+include /usr/share/nginx/modules/*.conf;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    log_format  main  '[$time_local] $remote_addr - $remote_user "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for" '
+                      'response_time="$request_time"s user_id="$upstream_http_x_user_id" '
+                      'ratelimit_limt="$upstream_http_x_ratelimit_limit" ratelimit_remaining="$upstream_http_x_ratelimit_remaining"';
+
+    access_log  /var/log/nginx/access.log  main;
+
+    gzip_disable "msie6";
+    gzip on;
+    gzip_proxied any;
+    gzip_comp_level 6; #// 1 to 9
+   # gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+    gzip_types text/plain text/css text/xml text/javascript application/json application/x-javascript application/javascript application/xml application/xml+rss image/x-icon image/bmp;
+
+    sendfile            on;
+    tcp_nopush          on;
+    tcp_nodelay         on;
+    keepalive_timeout   65;
+    types_hash_max_size 2048;
+    client_max_body_size 30M;
+
+    include             /etc/nginx/mime.types;
+    default_type        application/octet-stream;
+
+    # Load modular configuration files from the /etc/nginx/conf.d directory.
+    # See http://nginx.org/en/docs/ngx_core_module.html#include
+    # for more information.
+    include /etc/nginx/conf.d/*.conf;
+
+}
+
+```
+  
+</details>
