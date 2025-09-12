@@ -203,17 +203,69 @@ Curling this endpoint would show the same above status metrics.
 
 These variables enable inclusion of live connection stats in logs or custom dashboards.
 
+To embed the stub_status **embedded variables** like `$connections_active`, `$connections_reading`, `$connections_writing`, and `$connections_waiting` into an NGINX configuration (e.g., for logs or monitoring), here are clear examples:
+
 ***
 
-### Summary
+### Example 1: Embedding in custom access log format
 
+```nginx
+http {
+    log_format connection_status '$remote_addr - $remote_user [$time_local] '
+                                 '"$request" $status $body_bytes_sent '
+                                 'active=$connections_active reading=$connections_reading '
+                                 'writing=$connections_writing waiting=$connections_waiting '
+                                 'request_time=$request_time';
+
+    access_log /var/log/nginx/access.log connection_status;
+
+    server {
+        listen 80;
+        ...
+    }
+}
+```
+
+This creates log entries that include live connection counts showing how many connections are active, reading request headers, writing response bodies, and waiting idle.
+
+***
+
+### Example log entry output with embedded connection variables
+
+```
+192.168.1.100 - - [12/Sep/2025:13:10:00 +0530] "GET /index.html HTTP/1.1" 200 1024 active=267 reading=5 writing=180 waiting=82 request_time=0.123
+```
+
+***
+
+### Example 2: Using these variables in a status endpoint custom log
+
+```nginx
+server {
+    listen 80;
+
+    location = /status_log {
+        stub_status on;
+        access_log /var/log/nginx/status.log connection_status;
+        allow 127.0.0.1;
+        deny all;
+    }
+}
+```
+
+- Variables `$connections_active`, `$connections_reading`, `$connections_writing`, `$connections_waiting` can be used like any other NGINX variables in `log_format`.
+- Define a `log_format` using these variables alongside other request info.
+- Reference that format in `access_log` directive inside `http` or `server` context.
+- The values reflect real-time states of connections when the log entry is made.
+- This setup is useful for integrating live connection info directly into access or custom logs for monitoring and troubleshooting.
+
+#### Summary
 The `ngx_http_stub_status_module` is a simple yet powerful tool for live monitoring of the NGINX server status. It exposes:
 
 - Total active connections
 - Total accepted, handled, and processed requests
 - Breakdown of connections currently reading requests, writing responses, and waiting idly
-
-This status info helps operators understand current load, diagnose issues, and tune performance.
+- This status info helps operators understand current load, diagnose issues, and tune performance.
 
 ---
 
