@@ -1,4 +1,91 @@
 # NGINX
+nginx ("engine x") is an HTTP web server, reverse proxy, content cache, load balancer, TCP/UDP proxy server, and mail proxy server.
+
+NGINX includes a wide range of modules that extend its core functionality. Here is an overview of some key NGINX modules organized by category, including official built-in and dynamic modules:
+
+***
+
+### Core NGINX HTTP Modules (examples)
+
+| Module Name                   | Description                                      |
+|------------------------------|------------------------------------------------|
+| ngx_http_core_module         | Core HTTP module, essential for basic processing|
+| ngx_http_log_module          | Handles logging of HTTP requests and responses  |
+| ngx_http_stub_status_module  | Provides basic live status info for NGINX       |
+| ngx_http_access_module       | Controls client access rules                      |
+| ngx_http_auth_basic_module   | HTTP Basic Authentication support                |
+| ngx_http_limit_conn_module   | Limits number of simultaneous connections        |
+| ngx_http_limit_req_module    | Request rate limiting                             |
+| ngx_http_rewrite_module      | Supports URL rewriting and redirects             |
+| ngx_http_ssl_module          | SSL/TLS support for HTTP                          |
+| ngx_http_gzip_module         | Gzip compression                                  |
+| ngx_http_proxy_module        | Proxying HTTP requests to backend servers        |
+| ngx_http_fastcgi_module      | FastCGI support for PHP and other apps           |
+| ngx_http_geoip_module        | GeoIP-based IP location functions                 |
+| ngx_http_headers_module      | Manipulates HTTP headers                          |
+
+***
+
+### Mail modules (SMTP, IMAP, POP3)
+
+| Module Name                 | Description                                      |
+|----------------------------|------------------------------------------------|
+| ngx_mail_core_module       | Core mail streaming module                       |
+| ngx_mail_ssl_module        | SSL/TLS support for mail protocols               |
+| ngx_mail_auth_http_module  | HTTP-based mail authentication                    |
+| ngx_mail_proxy_module      | Mail proxy functionality                          |
+
+***
+
+### Stream (TCP/UDP) Modules
+
+| Module Name            | Description                                        |
+|-----------------------|--------------------------------------------------|
+| ngx_stream_core_module | Core stream module for TCP/UDP proxying           |
+| ngx_stream_ssl_module  | SSL/TLS support in stream module                   |
+| ngx_stream_limit_conn_module | Limits connections for stream                      |
+
+***
+
+### Popular Dynamic/Third-party Modules (examples)
+
+| Module Name              | Description                                            |
+|--------------------------|--------------------------------------------------------|
+| ngx_http_lua_module      | Lua scripting inside NGINX                              |
+| ngx_http_perl_module     | Perl scripting                                          |
+| ngx_http_js_module       | JavaScript scripting (njs)                             |
+| ngx_http_image_filter_module | Image processing                                        |
+| ngx_http_geoip2_module   | IP Geolocation support using GeoIP2                    |
+| ngx_http_brotli_filter_module | Brotli compression                                     |
+| ngx_http_waf_module      | Web Application Firewall (security)                    |
+| ngx_http_auth_jwt_module | JWT authentication                                     |
+| ngx_http_vts_module      | Virtual host traffic status                             |
+| ngx_http_redis_module    | Redis integration                                      |
+| ngx_http_pagespeed_module| Google PageSpeed optimizations                          |
+
+***
+
+### How to list enabled modules on your system
+
+Run this command in the terminal to see all modules NGINX was built with:
+
+```bash
+nginx -V 2>&1 | grep _module
+```
+
+This will output static and dynamic modules compiled or available.
+
+***
+
+### Official NGINX Documentation source of modules
+
+The official modules list is available in NGINX documentation here:
+
+- https://nginx.org/en/docs/
+
+- https://nginx.org/en/docs/http/ngx_http_core_module.html (example of a core module docs)
+
+***
 
 ## Parameters in NGINX
 1. NGINX Request & Access Log Parameters
