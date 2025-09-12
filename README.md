@@ -1,9 +1,4 @@
 # NGINX Configuration
-Let's break down the provided NGINX configuration line by line, explain each directive, and discuss possible parameters and their significance:
-
-Let's dive into **NGINX's architecture**, focusing on **worker processes**, **configuration blocks**, **variables**, and **parameters**, with detailed explanations and use cases.
-
----
 
 ## **1. Worker Processes**
 ### **What Are Worker Processes?**
