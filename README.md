@@ -62,3 +62,52 @@ These come from **headers set by your backend application** to measure internal 
 | `$upstream_http_other_time`    | Time spent on **other backend tasks** not covered above | `0.010`       |
 
 ---
+
+Short answer: Use the NGINX stub_status module to see live connection counts and processing states in real time (Active, Reading, Writing, Waiting), and use the cumulative requests counter to infer how many have completed by taking deltas over time; NGINX Plus adds a live API with per‑zone request/response counts for precise “returned” totals by status code class.
+
+## What to use
+- Open source: stub_status exposes basic live metrics: Active connections, accepts, handled, requests, Reading, Writing, Waiting, plus embedded variables for these values.
+- NGINX Plus: Live Activity Monitoring (dashboard and REST API) exposes detailed request and response counts, including responses by status class and per upstream/server zone, ideal for “how many returned” in real time.
+
+## Key metrics explained
+- Active connections: current live client connections, including idle keep‑alive (Waiting).
+- Reading: connections where NGINX is reading the request header; Writing: connections where NGINX is sending the response; Waiting: idle keep‑alive connections awaiting a new request.
+- requests (counter): total client requests since start; “returned” can be approximated as the increase in this counter over an interval minus any currently in‑flight requests, while NGINX Plus exposes explicit response counts by status class.
+
+## Quick formulas
+- In‑process now ≈ Reading + Writing, since these represent requests currently being received or responded to.
+- Live connections now = Active connections, noting this includes Waiting (idle keep‑alive) as well as Reading and Writing.
+- Completed/returned over interval $$ \Delta t $$ ≈ $$ \Delta\text{requests} $$, i.e., requests(t2) − requests(t1), with NGINX Plus offering direct response counters by class for precision.
+
+## Stub_status parameters and variables
+| Parameter/Variable | Explanation | Example |
+|---|---|---|
+| Active connections | Current number of live client connections, including Waiting (idle keep‑alive)  | 291  |
+| accepts | Total number of accepted client connections since start (cumulative)  | 16630948  |
+| handled | Total number of handled connections; typically equals accepts unless limits were hit  | 16630948  |
+| requests | Total client requests processed since start (cumulative)  | 31070465  |
+| Reading | Connections where NGINX is reading the request header (in‑flight)  | 6  |
+| Writing | Connections where NGINX is writing the response (in‑flight)  | 179  |
+| Waiting | Idle keep‑alive connections waiting for a request  | 106  |
+| $connections_active | Embedded variable equal to “Active connections”  | 291  |
+| $connections_reading | Embedded variable equal to “Reading”  | 6  |
+| $connections_writing | Embedded variable equal to “Writing”  | 179  |
+| $connections_waiting | Embedded variable equal to “Waiting”  | 106  |
+
+## How to enable live view (open source)
+- Add a protected location and enable stub_status, then reload NGINX, which exposes the counters above as a simple text page.
+- A minimal example uses “location = /basic_status { stub_status; }”, producing output like “Active connections: 291 … Reading: 6 Writing: 179 Waiting: 106” for quick at‑a‑glance monitoring.
+
+```nginx
+location = /basic_status {
+    stub_status;
+    allow 127.0.0.1;  # restrict as needed
+    deny all;
+}
+```
+
+This produces the canonical stub_status output with Active/accepts/handled/requests/Reading/Writing/Waiting fields for live inspection and scraping by monitors that understand the format.
+
+## How to get exact “returned” counts
+- With stub_status, track “requests” as a counter and compute deltas per collection interval to approximate “requests returned,” subtracting in‑flight if needed using Reading + Writing for momentary in‑process counts.
+- With NGINX Plus, use the REST API (for example, /api/<version>/http/server_zones and /api/<version>/connections) to obtain precise live request and response counters, including responses by status class, suitable for dashboards and SLOs.
