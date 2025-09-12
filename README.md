@@ -1,9 +1,265 @@
 # NGINX
 nginx ("engine x") is an HTTP web server, reverse proxy, content cache, load balancer, TCP/UDP proxy server, and mail proxy server.
 
+<details>
+    <summary>Click to view the guide to nginx</summary>
+
+Here’s your content rewritten into **documentation format**, aligned with the style, headings, and keywords used in the official **nginx beginner’s guide**:
+
+---
+
+# Beginner’s Guide to nginx
+
+This guide provides a basic introduction to **nginx** and describes simple tasks that can be performed with it. It is assumed that nginx is already installed on the system. If it is not, see the [Installing nginx](https://nginx.org/en/docs/install.html) page.
+
+This guide covers:
+
+* Starting, stopping, and reloading nginx
+* Understanding the configuration file’s structure
+* Serving static content
+* Configuring nginx as a proxy server
+* Connecting nginx with a FastCGI application
+
+---
+
+## Master and Worker Processes
+
+nginx has **one master process** and several **worker processes**.
+
+* **Master process**:
+
+  * Reads and evaluates configuration
+  * Maintains worker processes
+
+* **Worker processes**:
+
+  * Handle actual request processing
+  * Use an **event-based model** with OS-dependent mechanisms for efficiency
+
+The number of worker processes is defined in the configuration file using the [`worker_processes`](https://nginx.org/en/docs/ngx_core_module.html#worker_processes) directive. This can either be a fixed number or automatically adjusted to the number of available CPU cores.
+
+---
+
+## Configuration File
+
+The way nginx and its modules behave is determined by the **configuration file**.
+
+* Default name: `nginx.conf`
+* Common locations:
+
+  * `/usr/local/nginx/conf`
+  * `/etc/nginx`
+  * `/usr/local/etc/nginx`
+
+---
+
+## Starting, Stopping, and Reloading Configuration
+
+To start nginx, run the executable:
+
+```bash
+nginx
+```
+
+Once started, it can be controlled using the **-s** parameter:
+
+```bash
+nginx -s signal
+```
+
+### Supported signals:
+
+* **stop** — fast shutdown
+* **quit** — graceful shutdown
+* **reload** — reload configuration
+* **reopen** — reopen log files
+
+For example, to gracefully stop nginx:
+
+```bash
+nginx -s quit
+```
+
+To reload configuration after changes:
+
+```bash
+nginx -s reload
+```
+
+### Sending signals using `kill`
+
+You can also control nginx processes with standard Unix tools:
+
+```bash
+kill -s QUIT <master_process_id>
+```
+
+The **PID** of the master process is stored in:
+
+* `/usr/local/nginx/logs/nginx.pid`
+* `/var/run/nginx.pid`
+
+To list running nginx processes:
+
+```bash
+ps -ax | grep nginx
+```
+
+For more, see [Controlling nginx](https://nginx.org/en/docs/control.html).
+
+---
+
+## Configuration File’s Structure
+
+nginx consists of **modules** controlled by **directives**.
+
+* **Simple directives**:
+
+  * Name + parameters, end with `;`
+* **Block directives**:
+
+  * Same as simple directives, but with `{ ... }` containing additional instructions
+
+Some block directives can contain other directives — these are called **contexts**. Examples:
+
+* `events`
+* `http`
+* `server`
+* `location`
+
+Directives outside of any context belong to the **main context**.
+
+* `events` and `http` → in main context
+* `server` → in `http` context
+* `location` → in `server` context
+
+Anything after `#` is a **comment**.
+
+---
+
+## Serving Static Content
+
+Serving static files (HTML, images, etc.) is a core function of nginx.
+
+Example:
+
+* `/data/www` → HTML files
+* `/data/images` → image files
+
+Create directories:
+
+```bash
+mkdir -p /data/www /data/images
+echo "Hello from nginx" > /data/www/index.html
+```
+
+### Server configuration:
+
+```nginx
+server {
+    location / {
+        root /data/www;
+    }
+
+    location /images/ {
+        root /data;
+    }
+}
+```
+
+* Requests starting with `/images/` → `/data/images`
+* Other requests → `/data/www`
+
+Example:
+
+* `http://localhost/images/example.png` → `/data/images/example.png`
+* `http://localhost/page.html` → `/data/www/page.html`
+
+Apply changes:
+
+```bash
+nginx -s reload
+```
+
+Logs are in:
+
+* `/usr/local/nginx/logs/access.log`
+* `/usr/local/nginx/logs/error.log`
+* or `/var/log/nginx`
+
+---
+
+## Setting Up a Simple Proxy Server
+
+nginx can act as a **proxy server** — forwarding requests to other servers.
+
+### Step 1: Define proxied server
+
+```nginx
+server {
+    listen 8080;
+    root /data/up1;
+
+    location / {
+    }
+}
+```
+
+* Listens on port **8080**
+* Serves files from `/data/up1`
+
+### Step 2: Configure proxy server
+
+```nginx
+server {
+    location / {
+        proxy_pass http://localhost:8080;
+    }
+
+    location ~ \.(gif|jpg|png)$ {
+        root /data/images;
+    }
+}
+```
+
+* Requests for `.gif`, `.jpg`, `.png` → served locally
+* All other requests → forwarded to proxied server on `localhost:8080`
+
+---
+
+## Setting Up FastCGI Proxying
+
+nginx can also pass requests to **FastCGI servers** (e.g., PHP).
+
+### Example configuration:
+
+```nginx
+server {
+    location / {
+        fastcgi_pass  localhost:9000;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param QUERY_STRING    $query_string;
+    }
+
+    location ~ \.(gif|jpg|png)$ {
+        root /data/images;
+    }
+}
+```
+
+* Requests → FastCGI server on **localhost:9000**
+* `SCRIPT_FILENAME` → determines script file
+* `QUERY_STRING` → passes request parameters
+* Static images (`gif/jpg/png`) → served locally
+
+---
+    
+</details>
+
 NGINX includes a wide range of modules that extend its core functionality. Here is an overview of some key NGINX modules organized by category, including official built-in and dynamic modules:
 
-***
+<details>
+    <summary>Click to view all the Modules Supported by nginx</summary>
 
 ### Core NGINX HTTP Modules (examples)
 
@@ -64,6 +320,8 @@ NGINX includes a wide range of modules that extend its core functionality. Here 
 | ngx_http_pagespeed_module| Google PageSpeed optimizations                          |
 
 ***
+
+</details>
 
 ### How to list enabled modules on your system
 
