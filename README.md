@@ -1,6 +1,13 @@
 # NGINX
 
 ## Parameters in NGINX
+1. NGINX Request & Access Log Parameters
+2. NGINX Backend (Upstream) Log Parameters
+3. Custom Application-Specific Parameters
+
+<details>
+    <summary>Click to view the details Parameters in NGINX</summary>
+
 ### 1. **NGINX Request & Access Log Parameters**
 
 These are **client-side and request-related values** directly handled by NGINX.
@@ -60,6 +67,8 @@ These come from **headers set by your backend application** to measure internal 
 | `$upstream_http_db_write_time` | Time backend spent **writing to DB**                    | `0.008`       |
 | `$upstream_http_analysis_time` | Time backend spent on **business logic/analysis**       | `0.015`       |
 | `$upstream_http_other_time`    | Time spent on **other backend tasks** not covered above | `0.010`       |
+
+</details>
 
 ---
 
