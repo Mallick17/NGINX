@@ -2076,4 +2076,101 @@ You get JSON like:
 
 ---
 
+## Module `ngx_http_upstream_module`
+Got it 👍 — you want a **simple, real-life explanation** of the `ngx_http_upstream_module` and what each directive/variable means with an example setup. Let’s break this down step by step in **easy language**.
+
+---
+
+## 🔹 What `ngx_http_upstream_module` Does
+
+It lets you define a **group of backend servers** (called an *upstream*) that NGINX can load-balance traffic across.
+You can then reference that group with `proxy_pass`, `fastcgi_pass`, `uwsgi_pass`, etc.
+
+> Think of it as:
+> “Here’s a pool of servers; distribute requests across them according to my rules.”
+
+<details>
+    <summary>Click to view Example, Parameters, Load Balancing Methods and Logs</summary>
+
+#### Example Setup
+
+```nginx
+http {
+    upstream backend {
+        zone http_backend 64k;                # Enables stats across workers
+        server backend1.example.com weight=5; # This one gets 5x more traffic
+        server backend2.example.com max_fails=3 fail_timeout=10s; # If it fails 3 times in 10s → mark unavailable
+        server backend3.example.com backup;   # Used only if others are down
+    }
+
+    server {
+        listen 80;
+        server_name api.example.com;
+
+        location / {
+            proxy_pass http://backend;        # Send all traffic to upstream group
+        }
+    }
+}
+```
+
+---
+
+#### Explanation of Common Parameters
+
+* **weight=5** → Gives more traffic to that server (e.g., 5 out of every 7 requests go to `backend1`).
+* **max\_fails=3 fail\_timeout=10s** → If 3 failures happen within 10s, mark the server as “down” for 10s.
+* **backup** → Only used if all primary servers are down.
+* **zone http\_backend 64k** → Stores upstream stats in shared memory, so you can monitor connections, requests, failures, etc.
+
+---
+
+#### Load Balancing Methods
+
+By default, NGINX uses **round robin**. You can also use:
+
+* `ip_hash;` → Sticky sessions by client IP.
+* `least_conn;` → Send requests to the server with the fewest active connections.
+* `hash $request_uri consistent;` → Send requests consistently based on a hash (e.g., same URL → same server).
+* `random two least_conn;` → Pick two servers at random, then choose the one with fewer connections.
+
+---
+
+#### Useful Embedded Variables
+
+These variables let you log or debug upstream activity:
+
+* `$upstream_addr` → Address of the backend that handled the request (`192.168.1.2:80`).
+* `$upstream_response_time` → How long it took the backend to respond.
+* `$upstream_status` → HTTP status code returned by backend (e.g., `200`, `502`).
+* `$upstream_cache_status` → Shows cache behavior (`MISS`, `HIT`, `BYPASS`, etc.).
+* `$upstream_bytes_sent / $upstream_bytes_received` → Bytes sent to/from backend.
+* `$upstream_queue_time` → Time spent waiting in queue if all backends are busy.
+
+---
+
+#### Example Log Format with Upstream Metrics
+
+```nginx
+log_format upstreamlog
+  '$remote_addr → $upstream_addr '
+  'status=$status upstream_status=$upstream_status '
+  'resp_time=$request_time upstream_time=$upstream_response_time '
+  'cache=$upstream_cache_status';
+
+access_log /var/log/nginx/access.log upstreamlog;
+```
+
+Sample log:
+
+```
+192.168.1.10 → 10.0.0.2:8080 status=200 upstream_status=200 resp_time=0.120 upstream_time=0.110 cache=MISS
+```
+
+> With this, you can see exactly which upstream handled the request, how long it took, and whether it was served from cache or backend.
+
+</details>
+
+
+
 
