@@ -2172,5 +2172,157 @@ Sample log:
 </details>
 
 
+<details>
+    <summary>Click to view Explaination of Entire Setup</summary>
+
+> **JWT validation** with `auth_request`
+> **Upstream load balancing** with failover
+> **Detailed logging** (user ID from JWT + upstream debug info)
+
+### Step 1: Auth Service (JWT validator)
+
+You need a small backend service (`auth.example.com`) that validates JWTs.
+
+* If token valid → return `200 OK` and include `X-User-ID` header
+* If invalid/expired → return `401 Unauthorized`
+
+For example (pseudo code for an `/auth` endpoint):
+
+```js
+// Node.js example
+app.get("/auth", (req, res) => {
+  const token = req.headers["authorization"]?.replace("Bearer ", "");
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    res.setHeader("X-User-ID", payload.sub); // user ID claim
+    res.sendStatus(200);
+  } catch (err) {
+    res.sendStatus(401);
+  }
+});
+```
+
+---
+
+### Step 2: NGINX Configuration
+
+```nginx
+http {
+    ##
+    ## 1. Upstream load balancing setup
+    ##
+    upstream backend {
+        zone http_backend 64k;
+        server backend1.example.com weight=3;
+        server backend2.example.com max_fails=3 fail_timeout=10s;
+    }
+
+    ##
+    ## 2. Main API server
+    ##
+    server {
+        listen 80;
+        server_name api.example.com;
+
+        ##
+        ## JWT validation subrequest
+        ##
+        location / {
+            # Before proxying to backend, call /auth
+            auth_request /auth;
+
+            # Save X-User-ID from auth response
+            auth_request_set $user_id $upstream_http_x_user_id;
+
+            proxy_pass http://backend;
+
+            # Forward user info to backend
+            proxy_set_header X-User-ID $user_id;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+
+        ##
+        ## Internal auth subrequest location
+        ##
+        location = /auth {
+            internal;
+            proxy_pass http://auth.example.com/validate;
+            proxy_pass_request_body off;           # no body needed
+            proxy_set_header Content-Length "";
+            proxy_set_header X-Original-URI $request_uri;
+        }
+
+        ##
+        ## 3. Logs: include upstream + JWT info
+        ##
+        log_format jwt_upstream_debug
+          '[$time_local] client=$remote_addr user_id=$user_id '
+          'request="$request" status=$status '
+          'upstream=$upstream_addr upstream_status=$upstream_status '
+          'req_time=$request_time upstream_time=$upstream_response_time '
+          'cache=$upstream_cache_status';
+
+        access_log /var/log/nginx/access.log jwt_upstream_debug;
+    }
+}
+```
+
+---
+
+### Step 3: How Logs Look
+
+#### Valid token → backend1
+
+```
+[2025-09-13 12:00:01] client=192.168.1.50 user_id=42
+request="GET /orders" status=200
+upstream=backend1.example.com upstream_status=200
+req_time=0.120 upstream_time=0.115 cache=MISS
+```
+
+> User ID `42` from JWT validated, request served by backend1.
+
+---
+
+#### Valid token but backend2 slow
+
+```
+[2025-09-13 12:00:05] client=192.168.1.51 user_id=17
+request="GET /orders" status=200
+upstream=backend2.example.com upstream_status=200
+req_time=2.500 upstream_time=2.480 cache=MISS
+```
+
+> Backend2 clearly slow — **NGINX log pinpoints the issue**.
+
+---
+
+#### Invalid token
+
+```
+[2025-09-13 12:00:10] client=192.168.1.52 user_id= -
+request="GET /orders" status=401
+upstream=- upstream_status=- req_time=0.005 upstream_time=- cache=-
+```
+
+> No backend hit, request blocked at `/auth`.
+
+---
+
+### Benefits of This Setup
+
+* **Security**: All requests validated via JWT before hitting upstream.
+* **Resilience**: Load balancing + automatic failover for backends.
+* **Debugging**: Access logs show:
+
+  * Which user (`user_id`)
+  * Which backend (`upstream_addr`)
+  * How long it took (`upstream_response_time`)
+  * Whether backend failed (`upstream_status`)
+
+> With this setup, you get **end-to-end observability**:
+From **user identity (JWT)** → to **backend health (upstream logs)** → to **response performance**.
+ 
+</details>
 
 
