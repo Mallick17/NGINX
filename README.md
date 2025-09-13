@@ -1089,7 +1089,8 @@ Output:
 > If the token is valid → request continues.
 > If invalid → NGINX rejects with `401 Unauthorized` (or `403 Forbidden` if configured).
 
----
+<details>
+    <summary>Click to view the Configuration</summary>
 
 ### Example configuration
 
@@ -1163,6 +1164,195 @@ This module is pretty complete (but only with **NGINX Plus**, not OSS):
 * **`auth_basic`** = “password gate” (static).
 * **`auth_jwt`** = “token gate” (dynamic, for modern APIs).
 
+</details>
+
+<details>
+    <summary>Click to view the Setup</summary>
+
+### Goal
+
+We want to protect `/api/*` routes behind **JWT authentication** using OSS NGINX.
+Since OSS NGINX doesn’t support JWT directly, we’ll use:
+
+* **NGINX `auth_request`** → asks a helper service if a token is valid.
+* **Validator service** → checks the JWT (signature, expiry, claims).
+* **Backend app** → only gets the request if token is valid.
+
 ---
 
+### Step 1. Install tools
 
+* NGINX OSS installed (e.g. `apt install nginx` or `yum install nginx`).
+* Python (for our simple JWT validator demo).
+
+  ```bash
+  pip install flask pyjwt
+  ```
+
+---
+
+### Step 2. Create JWT Validator Service
+
+Make a small Python script `validator.py`:
+
+```python
+from flask import Flask, request, jsonify
+import jwt, datetime
+
+app = Flask(__name__)
+SECRET = "mysecret"  # same secret used when creating JWTs
+
+@app.route("/validate", methods=["GET"])
+def validate():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Missing token"}), 401
+
+    token = auth_header.split(" ")[1]
+
+    try:
+        payload = jwt.decode(token, SECRET, algorithms=["HS256"])
+        return jsonify({"ok": True, "user": payload.get("sub")}), 200
+    except jwt.ExpiredSignatureError:
+        return jsonify({"error": "Token expired"}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({"error": "Invalid token"}), 401
+
+if __name__ == "__main__":
+    app.run(port=9000)
+```
+
+Run it:
+
+```bash
+python validator.py
+```
+
+> Now you have a service at `http://127.0.0.1:9000/validate` that says if a JWT is good or bad.
+
+---
+
+#### Step 3. Configure NGINX
+
+Edit `/etc/nginx/conf.d/jwt.conf`:
+
+```nginx
+server {
+    listen 80;
+
+    # Protect all /api routes
+    location /api/ {
+        auth_request /jwt-auth;          # check token first
+        proxy_pass http://127.0.0.1:8080; # your backend app
+    }
+
+    # Internal location to validate token
+    location = /jwt-auth {
+        internal;
+        proxy_pass http://127.0.0.1:9000/validate;  # validator service
+        proxy_set_header Authorization $http_authorization;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+    }
+
+    # Handle failed auth (401/403)
+    error_page 401 = @error401;
+    location @error401 {
+        return 401 '{"error":"Invalid or expired token"}';
+        add_header Content-Type application/json;
+    }
+}
+```
+
+Reload NGINX:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+---
+
+### Step 4. Generate a JWT for testing
+
+Make a Python script `make_token.py`:
+
+```python
+import jwt, datetime
+
+SECRET = "mysecret"
+payload = {
+    "sub": "user123",
+    "role": "admin",
+    "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=5) # expires in 5 minutes
+}
+
+token = jwt.encode(payload, SECRET, algorithm="HS256")
+print(token)
+```
+
+Run it:
+
+```bash
+python make_token.py
+```
+
+Copy the printed token.
+
+---
+
+### Step 5. Test the Setup
+
+1. **Valid Token**
+
+```bash
+curl -H "Authorization: Bearer <PASTE_TOKEN>" http://localhost/api/test
+```
+
+* NGINX calls validator → validator says token is OK → NGINX forwards to your backend app (port 8080).
+
+2. **No Token**
+
+```bash
+curl http://localhost/api/test
+```
+
+Response:
+
+```json
+{"error":"Invalid or expired token"}
+```
+
+3. **Expired/Invalid Token**
+
+```bash
+curl -H "Authorization: Bearer BADTOKEN" http://localhost/api/test
+```
+
+Response:
+
+```json
+{"error":"Invalid or expired token"}
+```
+
+---
+
+### Step 6. Where new tokens come from
+
+> NGINX **does not** create tokens.
+
+* Your **app (Laravel, Flask, etc.)** must provide a `/auth/login` endpoint.
+* That endpoint issues a JWT after username/password login.
+* Clients store the token and send it in every request.
+* If token expires, client must call `/auth/refresh` or `/auth/login` again.
+
+---
+
+### Summary
+
+1. **NGINX** → gatekeeper. Uses `auth_request` to check JWTs.
+2. **Validator service** → checks if JWT is valid.
+3. **Backend app** → only gets traffic if JWT is valid.
+4. **NGINX never creates tokens** → your app or IdP must issue them.
+
+</details>
