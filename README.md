@@ -1893,3 +1893,152 @@ Result for `/files/` might look like:
 </details>
 
 ---
+
+## Module `ngx_http_status_module`
+
+* This module gives you **detailed status info about NGINX**: connections, requests, upstreams, caches, SSL stats, etc.
+* Think of it as an **advanced version of `stub_status`**.
+* Unlike `stub_status` (which only shows basic counters), this one outputs **JSON (or JSONP)** with rich data.
+
+<details>
+    <summary>Click to view Example, Config, and Output</summary>
+
+### Example Scenario
+
+Imagine you’re running an API behind NGINX with **2 upstream servers**.
+You want to:
+
+* See how many requests each server handled.
+* See active connections, response codes, errors.
+* Monitor cache usage (if using proxy\_cache).
+
+---
+
+### Example Configuration
+
+```nginx
+http {
+    upstream backend {
+        zone http_backend 64k;             # shared memory zone for stats
+        server backend1.example.com weight=5;
+        server backend2.example.com;
+    }
+
+    proxy_cache_path /data/nginx/cache_backend keys_zone=cache_backend:10m;
+
+    server {
+        listen 80;
+        server_name api.example.com;
+
+        location / {
+            proxy_pass http://backend;
+            proxy_cache cache_backend;
+            health_check;
+        }
+
+        # Collect stats for this server
+        status_zone server_backend;
+    }
+
+    # Monitoring endpoint (internal or restricted)
+    server {
+        listen 127.0.0.1;
+
+        location /status {
+            status;                       # enable status endpoint
+            status_format json;           # output JSON
+        }
+
+        location = /status.html { }
+    }
+}
+```
+
+---
+
+### Example Outputs
+
+### If you curl `/status`
+
+```bash
+curl http://127.0.0.1/status
+```
+
+You get JSON like:
+
+```json
+{
+  "version": 8,
+  "nginx_version": "1.25.3",
+  "connections": {
+    "accepted": 5000,
+    "dropped": 10,
+    "active": 120,
+    "idle": 20
+  },
+  "requests": {
+    "total": 20000,
+    "current": 15
+  },
+  "server_zones": {
+    "server_backend": {
+      "processing": 5,
+      "requests": 15000,
+      "responses": {
+        "total": 15000,
+        "2xx": 14000,
+        "4xx": 500,
+        "5xx": 500
+      },
+      "received": 12345678,
+      "sent": 98765432
+    }
+  },
+  "upstreams": {
+    "backend": {
+      "peers": [
+        {
+          "id": 1,
+          "server": "backend1.example.com",
+          "state": "up",
+          "active": 10,
+          "requests": 8000,
+          "responses": { "2xx": 7800, "5xx": 200 },
+          "fails": 5
+        },
+        {
+          "id": 2,
+          "server": "backend2.example.com",
+          "state": "up",
+          "active": 5,
+          "requests": 7000,
+          "responses": { "2xx": 6900, "5xx": 100 },
+          "fails": 3
+        }
+      ]
+    }
+  }
+}
+```
+
+---
+
+### Why It’s Useful
+
+* **Better than `stub_status`** → you see request counts, per-upstream stats, response codes, cache hits/misses.
+* **Monitoring tools** (like Grafana, Prometheus, Datadog) can easily parse this JSON.
+* Lets you set up **dashboards**:
+
+  * Active connections.
+  * Request rate.
+  * Per-upstream health & failures.
+  * Cache usage.
+
+> Inshort
+* Use `status` (NGINX Plus) for full **JSON API-style monitoring** with rich metrics.
+
+</details>
+
+---
+
+
