@@ -4,10 +4,6 @@ nginx ("engine x") is an HTTP web server, reverse proxy, content cache, load bal
 <details>
     <summary>Click to view the guide to nginx</summary>
 
-Here’s your content rewritten into **documentation format**, aligned with the style, headings, and keywords used in the official **nginx beginner’s guide**:
-
----
-
 # Beginner’s Guide to nginx
 
 This guide provides a basic introduction to **nginx** and describes simple tasks that can be performed with it. It is assumed that nginx is already installed on the system. If it is not, see the [Installing nginx](https://nginx.org/en/docs/install.html) page.
@@ -1078,3 +1074,95 @@ Output:
 </details>
 
 ---
+
+## Module `ngx_http_auth_jwt_module`
+* This module lets NGINX check incoming requests for a **JWT token**.
+* JWTs are often used in modern APIs, OAuth2, and OpenID Connect (OIDC).
+* The token is usually sent in the `Authorization: Bearer <token>` header, a cookie, or query parameter.
+* NGINX validates the JWT:
+
+  * Verifies the **signature** with a public/private key.
+  * Optionally decrypts it (if JWE).
+  * Checks expiry (`exp`) and “not before” (`nbf`) times.
+  * You can enforce claims (like `iss`, `aud`, `role`).
+
+> If the token is valid → request continues.
+> If invalid → NGINX rejects with `401 Unauthorized` (or `403 Forbidden` if configured).
+
+---
+
+### Example configuration
+
+```nginx
+server {
+    listen 80;
+
+    location /api/ {
+        auth_jwt "Secure API";                     # Realm name
+        auth_jwt_key_file /etc/nginx/jwt-keys.json; # Public keys in JWKS format
+
+        # Example: enforce a claim
+        auth_jwt_claim_set $email email;
+        auth_jwt_require $email;   # only allow if JWT has an "email" claim
+    }
+}
+```
+
+* Now if a request comes without a **valid JWT**, NGINX returns `401 Unauthorized`.
+* If JWT is valid, request passes through to your backend.
+
+---
+
+### Supported Algorithms
+
+This module is pretty complete (but only with **NGINX Plus**, not OSS):
+
+* **JWS (signed tokens):**
+
+  * HMAC (HS256, HS384, HS512)
+  * RSA (RS256, RS384, RS512)
+  * ECDSA (ES256, ES384, ES512)
+  * EdDSA (Ed25519, Ed448)
+  * Probabilistic RSA (PS256, PS384, PS512)
+* **JWE (encrypted tokens):**
+
+  * AES-CBC + HMAC, AES-GCM, AES Key Wrap, RSA-OAEP, direct mode.
+* **Nested JWTs**: signed first, then encrypted.
+
+---
+
+### Real-world use cases
+
+* **API Gateway / Reverse Proxy**: NGINX checks the token *before* it hits your app.
+* **OIDC / OAuth2 integration**: Validate tokens issued by Keycloak, Okta, Auth0, etc.
+* **Microservices**: Each request carries a JWT → NGINX enforces validity at the edge.
+* **Zero Trust setups**: Combine with IP restriction (`ngx_http_access_module`) or Basic Auth.
+
+---
+
+### How it differs from `auth_basic`
+
+* `auth_basic` → static username/password from a file (`htpasswd`).
+* `auth_jwt` → dynamic tokens signed by an Identity Provider (IdP).
+
+  * More secure for APIs.
+  * Supports role-based access (`claims`).
+  * Works with modern OAuth2/OpenID systems.
+
+---
+
+### Why it’s commercial (NGINX Plus only)
+
+* JWT validation requires parsing, crypto verification, possibly decryption.
+* That’s more advanced than OSS NGINX modules.
+* That’s why **`ngx_http_auth_jwt_module` is only in NGINX Plus**, not free OSS NGINX.
+
+---
+
+> In simple words:
+* **`auth_basic`** = “password gate” (static).
+* **`auth_jwt`** = “token gate” (dynamic, for modern APIs).
+
+---
+
+
