@@ -2077,14 +2077,9 @@ You get JSON like:
 ---
 
 ## Module `ngx_http_upstream_module`
-Got it 👍 — you want a **simple, real-life explanation** of the `ngx_http_upstream_module` and what each directive/variable means with an example setup. Let’s break this down step by step in **easy language**.
 
----
-
-## 🔹 What `ngx_http_upstream_module` Does
-
-It lets you define a **group of backend servers** (called an *upstream*) that NGINX can load-balance traffic across.
-You can then reference that group with `proxy_pass`, `fastcgi_pass`, `uwsgi_pass`, etc.
+- It lets you define a **group of backend servers** (called an *upstream*) that NGINX can load-balance traffic across.
+- You can then reference that group with `proxy_pass`, `fastcgi_pass`, `uwsgi_pass`, etc.
 
 > Think of it as:
 > “Here’s a pool of servers; distribute requests across them according to my rules.”
