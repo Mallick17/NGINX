@@ -2320,4 +2320,87 @@ From **user identity (JWT)** → to **backend health (upstream logs)** → to **
  
 </details>
 
+---
 
+## Module `ngx_http_upstream_conf_module` is
+
+* It’s an **extra module** (not part of free OSS NGINX).
+* It lets you **change upstream groups dynamically via HTTP requests** (no reload).
+* Think of it like an **admin API** for your upstream pools.
+
+Example:
+You can add/remove/disable backend servers in a load-balancing pool using just `curl`.
+
+<details>
+    <summary>Click to view Example Setup</summary>
+</details>
+
+---
+
+### Example Setup
+
+```nginx
+http {
+    upstream backend {
+        zone upstream_backend 64k;   # must use a shared memory zone
+        server backend1.example.com;
+        server backend2.example.com;
+    }
+
+    server {
+        listen 127.0.0.1;
+
+        location /upstream_conf {
+            upstream_conf;           # turn on control API
+            allow 127.0.0.1;          # restrict to local access
+            deny all;
+        }
+    }
+}
+```
+
+---
+
+### Example Commands
+
+1. **View the whole group**
+
+```bash
+curl "http://127.0.0.1/upstream_conf?upstream=backend"
+```
+
+2. **Add a new server**
+
+```bash
+curl "http://127.0.0.1/upstream_conf?add=&upstream=backend&server=127.0.0.1:8080"
+```
+
+3. **Mark a server as down**
+
+```bash
+curl "http://127.0.0.1/upstream_conf?upstream=backend&id=2&down="
+```
+
+4. **Remove a server**
+
+```bash
+curl "http://127.0.0.1/upstream_conf?remove=&upstream=backend&id=2"
+```
+
+---
+
+### Key Point
+
+* This is **not included in OSS NGINX**.
+* It was part of **NGINX Plus (commercial)** until **v1.13.10**.
+* After that, it was **replaced by `ngx_http_api_module`** (a JSON/REST API).
+
+> So:
+* If you’re running **free OSS NGINX** → you **do not have this**.
+* If you’re on **NGINX Plus (subscription)** → you can use `upstream_conf` (or the newer `api` module).
+
+</details>
+
+---
+
+## 
