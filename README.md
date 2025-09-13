@@ -1361,3 +1361,86 @@ Response:
 ---
 
 ## Module `ngx_http_auth_request_module`
+* It lets NGINX **ask another service** (via a subrequest) whether a client request should be allowed.
+* Think of it like:
+
+  > "Hey validator, is this request allowed?"
+
+  * If the validator says **200 OK** → NGINX allows the request.
+  * If the validator says **401 or 403** → NGINX blocks the request with that code.
+  * Any other response code → NGINX treats it as an error.
+
+  > This is how we plug JWT validation into OSS NGINX.
+
+---
+
+### Example from docs
+
+```nginx
+location /private/ {
+    auth_request /auth;
+    proxy_pass http://backend_app;
+}
+
+location = /auth {
+    proxy_pass http://127.0.0.1:9000/validate;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header X-Original-URI $request_uri;
+}
+```
+
+* `/private/` → protected resource.
+* `/auth` → subrequest target, forwards to a validator service.
+* If validator says 200 → `/private/` request continues.
+* If validator says 401/403 → access denied.
+
+---
+
+### Useful Directives
+
+#### `auth_request`
+
+* Enables the subrequest check.
+* Example:
+
+  ```nginx
+  auth_request /auth;
+  ```
+
+  → every request to this location will be checked against `/auth`.
+
+#### `auth_request_set`
+
+* Lets you capture values from the validator response headers and use them as NGINX variables.
+* Example:
+
+  ```nginx
+  auth_request_set $user_id $upstream_http_x_user_id;
+  proxy_set_header X-User-ID $user_id;
+  ```
+
+  → if the validator includes `X-User-ID: 123` in its response headers, NGINX can forward that to the backend app.
+
+This is powerful: you can pass **user\_id, roles, claims** from the JWT validator into your backend.
+
+---
+
+### Why It’s Useful
+
+* Works with **JWT, OAuth2, API keys, custom logic** → anything your validator service can check.
+* Decouples NGINX from application logic.
+* You can reuse the validator for multiple apps.
+* Can combine with:
+
+  * **`ngx_http_access_module`** (IP restriction)
+  * **`ngx_http_auth_basic_module`** (username/password)
+  * **satisfy directive** (e.g., allow if *either* IP or JWT is valid).
+
+---
+
+> So in simple terms:
+* `auth_request` = **NGINX asks another service if request is allowed**.
+* `auth_request_set` = **grab details from that answer and pass to backend**.
+
+---
