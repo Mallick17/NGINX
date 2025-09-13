@@ -416,6 +416,8 @@ These come from **headers set by your backend application** to measure internal 
 </details>
 
 ---
+### Module `ngx_http_core_module`
+### Module `ngx_http_api_module`
 
 ## Module `ngx_http_stub_status_module`
 
