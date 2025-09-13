@@ -2050,6 +2050,12 @@ You get JSON like:
 
 ```
 
+#### Summary of Mapping
+- connections / requests → always available.
+- server_zones → from status_zone.
+- upstreams → from zone inside upstream.
+- caches → from proxy_cache_path keys_zone.
+
 ---
 
 ### Why It’s Useful
