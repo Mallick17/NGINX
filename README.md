@@ -2322,7 +2322,7 @@ From **user identity (JWT)** → to **backend health (upstream logs)** → to **
 
 ---
 
-## Module `ngx_http_upstream_conf_module` is
+## Module `ngx_http_upstream_conf_module`
 
 * It’s an **extra module** (not part of free OSS NGINX).
 * It lets you **change upstream groups dynamically via HTTP requests** (no reload).
@@ -2333,7 +2333,6 @@ You can add/remove/disable backend servers in a load-balancing pool using just `
 
 <details>
     <summary>Click to view Example Setup</summary>
-</details>
 
 ---
 
@@ -2413,7 +2412,8 @@ curl "http://127.0.0.1/upstream_conf?remove=&upstream=backend&id=2"
 
 > It’s not built by default, you need to compile NGINX with `--with-stream`.
 
----
+<details>
+    <summary>Click to view Examples, Directives and Embedded Variables</summary>
 
 ### Example Use Cases
 
@@ -2532,5 +2532,8 @@ stream {
 
 > Together, they let NGINX handle **any kind of traffic** — web, API, DB, DNS, or custom protocol.
 
+</details>
 
 ---
+
+## Module `ngx_mail_core_module`
