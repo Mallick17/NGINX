@@ -1357,3 +1357,7 @@ Response:
 4. **NGINX never creates tokens** → your app or IdP must issue them.
 
 </details>
+
+---
+
+## Module `ngx_http_auth_request_module`
