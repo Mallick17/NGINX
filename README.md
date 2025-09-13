@@ -1623,4 +1623,142 @@ curl -H "Authorization: Bearer badtoken" http://localhost/api/hello
 
 ---
 
-## Module `ngx_http_auth_require_module`
+## Module `ngx_http_auth_require_module` (NGINX Plus)
+* Lets you **enforce access rules based on variables**.
+* Works well with variables from:
+
+  * `auth_jwt` (JWT claims),
+  * `auth_oidc` (OIDC claims),
+  * `auth_request` (custom validator headers).
+* Access is allowed only if the variable is **non-empty** and not equal to `"0"`.
+* Otherwise → request is denied with `403` (or another error you specify).
+
+> Think of it like:
+> “Even if the token is valid, don’t let the request pass unless the user’s claim/role matches my rule.”
+
+<details>
+    <summary>Click to view Examples</summary>
+
+### Example Scenario 1 — Admin-only Dashboard
+
+Your app has `/admin/*` routes. You only want users with `"role": "admin"` in their JWT to access it.
+
+### Config
+
+```nginx
+http {
+    # Extract role claim from JWT (requires ngx_http_auth_jwt_module)
+    auth_jwt          "restricted";
+    auth_jwt_key_file conf/keys.json;
+
+    # Map JWT role → allowed flag
+    map $jwt_claim_role $is_admin {
+        "admin" 1;
+    }
+
+    server {
+        listen 80;
+
+        location /admin/ {
+            # Require admin role
+            auth_require $is_admin;
+        }
+
+        location / {
+            return 200 "Hello, public!\n";
+        }
+    }
+}
+```
+
+#### Flow
+
+* JWT decoded → `role=admin` → `$is_admin=1` → request allowed.
+* JWT decoded → `role=user` → `$is_admin=0` → NGINX returns `403 Forbidden`.
+
+---
+
+### Example Scenario 2 — Multiple Conditions
+
+Require both:
+
+* role must be `"manager"`,
+* department must be `"finance"`.
+
+```nginx
+map $jwt_claim_role $is_manager {
+    "manager" 1;
+}
+
+map $jwt_claim_department $is_finance {
+    "finance" 1;
+}
+
+server {
+    listen 80;
+
+    location /finance-reports/ {
+        auth_require $is_manager;
+        auth_require $is_finance error=401; # custom error
+    }
+}
+```
+
+* If both match → allow.
+* If role fails → `403`.
+* If department fails → `401`.
+
+---
+
+### Example Scenario 3 — Combine with `auth_request`
+
+If you don’t use NGINX Plus JWT/OIDC modules, you can still use `auth_request` + `auth_require`.
+
+1. Validator service returns headers:
+
+   ```
+   X-Role: admin
+   X-Department: finance
+   ```
+
+2. NGINX captures them:
+
+   ```nginx
+   auth_request_set $user_role $upstream_http_x_role;
+   auth_request_set $user_dept $upstream_http_x_department;
+
+   map $user_role $is_admin {
+       "admin" 1;
+   }
+
+   map $user_dept $is_finance {
+       "finance" 1;
+   }
+
+   location /admin {
+       auth_request /jwt-auth;
+       auth_require $is_admin;
+   }
+   ```
+
+---
+
+### Real-life Use Cases
+
+* **Admin dashboards** → allow only if claim `role=admin`.
+* **Premium content** → allow only if claim `plan=premium`.
+* **Geo restrictions** → allow only if claim `region=eu`.
+* **Multi-factor** → combine rules, e.g., `auth_require $is_verified; auth_require $is_admin;`.
+
+---
+
+> In simple words:
+* `auth_jwt`/`auth_oidc` → validates JWT/OIDC and extracts claims.
+* `auth_request` → lets an external service decide validity.
+* `auth_require` → enforces *fine-grained rules* (like role, plan, department).
+
+</details>
+
+---
+
+## 
