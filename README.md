@@ -1373,7 +1373,7 @@ Response:
   > This is how we plug JWT validation into OSS NGINX.
 
 <details>
-    <summary>Click to view Examples and Uses</summary>
+    <summary>Click to view Scenario, Examples and Uses</summary>
 
 ### Example from docs
 
@@ -1395,6 +1395,26 @@ location = /auth {
 * `/auth` → subrequest target, forwards to a validator service.
 * If validator says 200 → `/private/` request continues.
 * If validator says 401/403 → access denied.
+
+---
+
+### Scenario
+
+You have a **Laravel app** running on `http://127.0.0.1:8000/api/hello`.
+You only want users with a **valid JWT** to access this endpoint.
+
+So:
+
+* **Client** sends request with `Authorization: Bearer <token>`.
+* **NGINX** asks a **validator service**: *“Is this token valid?”*
+* **Validator** checks the token:
+
+  * If valid → returns `200 OK`.
+  * If invalid/expired → returns `401 Unauthorized`.
+* **NGINX**:
+
+  * If validator said 200 → forwards request to Laravel.
+  * If validator said 401 → blocks the request.
 
 ---
 
@@ -1445,3 +1465,158 @@ This is powerful: you can pass **user\_id, roles, claims** from the JWT validato
 </details>
 
 ---
+
+<details>
+    <summary>Click to view Setup</summary>
+
+### Step 1. JWT Validator Service
+
+Create a small Python file `validator.py`:
+
+```python
+from flask import Flask, request, jsonify
+import jwt, datetime
+
+app = Flask(__name__)
+SECRET = "mysecret"
+
+@app.route("/validate", methods=["GET"])
+def validate():
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Missing token"}), 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, SECRET, algorithms=["HS256"])
+        return jsonify({"ok": True}), 200
+    except jwt.ExpiredSignatureError:
+        return jsonify({"error": "Expired"}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({"error": "Invalid"}), 401
+
+if __name__ == "__main__":
+    app.run(port=9000)
+```
+
+Run it:
+
+```bash
+pip install flask pyjwt
+python validator.py
+```
+
+---
+
+### Step 2. NGINX Config
+
+Edit `/etc/nginx/conf.d/jwt.conf`:
+
+```nginx
+server {
+    listen 80;
+
+    # Protected API
+    location /api/ {
+        auth_request /jwt-auth;          # ask validator first
+        proxy_pass http://127.0.0.1:8000; # your Laravel app
+    }
+
+    # Internal location for auth check
+    location = /jwt-auth {
+        internal;
+        proxy_pass http://127.0.0.1:9000/validate;
+        proxy_set_header Authorization $http_authorization;
+
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+    }
+
+    # Custom error for unauthorized
+    error_page 401 = @error401;
+    location @error401 {
+        return 401 '{"error":"Invalid or expired token"}';
+        add_header Content-Type application/json;
+    }
+}
+```
+
+Reload:
+
+```bash
+nginx -t && systemctl reload nginx
+```
+
+---
+
+### Step 3. Generate a Test JWT
+
+Make `make_token.py`:
+
+```python
+import jwt, datetime
+SECRET = "mysecret"
+
+payload = {
+    "sub": "user123",
+    "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=5)
+}
+token = jwt.encode(payload, SECRET, algorithm="HS256")
+print(token)
+```
+
+Run:
+
+```bash
+python make_token.py
+```
+
+---
+
+### Step 4. Test
+
+1. **Valid token**:
+
+```bash
+TOKEN=$(python make_token.py)
+curl -H "Authorization: Bearer $TOKEN" http://localhost/api/hello
+```
+
+> Goes through to Laravel.
+
+2. **No token**:
+
+```bash
+curl http://localhost/api/hello
+```
+
+❌ Response:
+
+```json
+{"error":"Invalid or expired token"}
+```
+
+3. **Expired/invalid token**:
+
+```bash
+curl -H "Authorization: Bearer badtoken" http://localhost/api/hello
+```
+
+❌ Response:
+
+```json
+{"error":"Invalid or expired token"}
+```
+
+---
+
+### In Simple Words
+
+* Client knocks on `/api/hello`.
+* NGINX whispers to validator: *“Hey, is this token good?”*
+* Validator replies:
+
+  * *Yes (200)* → Laravel gets the request.
+  * *No (401)* → NGINX stops it.
+    
+</details>
