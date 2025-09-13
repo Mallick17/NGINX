@@ -612,6 +612,94 @@ The `ngx_http_stub_status_module` is a simple yet powerful tool for live monitor
 - Breakdown of connections currently reading requests, writing responses, and waiting idly
 - This status info helps operators understand current load, diagnose issues, and tune performance.
 
+</details>
+
 ---
 
-</details>
+## Module `ngx_http_addition_module`
+
+### What it does
+
+The `ngx_http_addition_module` lets you tell NGINX:
+
+* “Before sending the normal response body, insert the response from `/before_action`.”
+* “After sending the normal response body, append the response from `/after_action`.”
+
+So NGINX will make **subrequests** to those URIs (or files) and include their responses inline.
+
+---
+
+### Example Configuration
+
+```nginx
+location / {
+    add_before_body /before_action;
+    add_after_body  /after_action;
+    root /usr/share/nginx/html;
+}
+
+location /before_action {
+    return 200 ">>> This is added before main response\n";
+}
+
+location /after_action {
+    return 200 "\n>>> This is added after main response";
+}
+```
+
+---
+
+### Example Request/Response
+
+#### Request
+
+```bash
+curl http://localhost/index.html
+```
+
+#### Normal `index.html` (if served directly)
+
+```
+<html>
+<body>
+Main page content here
+</body>
+</html>
+```
+
+#### With `ngx_http_addition_module` enabled
+
+```
+>>> This is added before main response
+
+<html>
+<body>
+Main page content here
+</body>
+</html>
+
+>>> This is added after main response
+```
+
+---
+
+### How it can be useful
+
+* **Injecting banners, notices, or disclaimers** before/after responses without editing the backend app.
+
+  * Example: “System under maintenance” warning at the top of every page.
+* **Debugging** → you can add debug text before or after body responses.
+* **Wrapping third-party content** → if you proxy to another backend but want to prepend/append content.
+* **Adding footers/headers in HTML APIs** (though for JSON APIs it’s generally not useful, because it breaks strict JSON).
+
+---
+
+### Limitations
+
+* It only works for responses with a body (`text/html`, etc.), not for `HEAD` requests or responses with `Content-Length: 0`.
+* It does **not** parse or understand HTML/JSON — it just blindly appends text.
+* If you use it with APIs (JSON/XML), it will usually break clients unless they’re designed to handle extra text.
+* **Best suited for HTML responses** where you want to inject banners, notices, or wrappers at the NGINX level.
+
+---
+
