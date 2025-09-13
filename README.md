@@ -807,7 +807,6 @@ It lets you **protect a page or a whole site with a username and password**.
 
 <details>
     <summary>Click to view Configuration </summary>
-</details>
 
 ## Example Configuration
 
@@ -1071,6 +1070,8 @@ Output:
 * NGINX supports **crypt, apr1-MD5, SHA/SSHA, and RFC 2307-style formats**.
 * For modern security, stick with **apr1-MD5** or **bcrypt**.
     
+</details>
+
 </details>
 
 ---
