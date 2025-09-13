@@ -802,3 +802,4 @@ server {
 
 ---
 
+## Module `ngx_http_auth_basic_module`
