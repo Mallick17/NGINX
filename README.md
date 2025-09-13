@@ -809,7 +809,9 @@ It lets you **protect a page or a whole site with a username and password**.
 * The user must enter the correct username + password before they can see the page.
 * This is called **HTTP Basic Authentication**.
 
----
+<details>
+    <summary>Click to view Configuration </summary>
+</details>
 
 ## Example Configuration
 
@@ -876,5 +878,109 @@ bob:$apr1$98fh29s.$kZpTjUq2IefB3R5hNQkty0
 
 > _In short:_
 > `ngx_http_auth_basic_module` = **simple password gate** you can put in front of any location in NGINX.
+
+<details>
+    <summary>Click to view the configuration</summary>
+
+## Configuration
+### Step 1. Create a password file
+
+On your server, run:
+
+```bash
+sudo sh -c "echo -n 'admin:' >> /etc/nginx/.htpasswd"
+sudo sh -c "openssl passwd -apr1 'StrongPassword123' >> /etc/nginx/.htpasswd"
+```
+
+This creates a user `admin` with password `StrongPassword123`.
+File: `/etc/nginx/.htpasswd`
+
+---
+
+### Step 2. Update NGINX config
+
+In your `server {}` block:
+
+```nginx
+location /nginx_status {
+    stub_status;
+
+    # Step 1: Restrict by IP
+    allow 127.0.0.1;       # localhost
+    allow 192.168.1.100;   # your office IP (example)
+    deny all;              # everyone else denied
+
+    # Step 2: Require Basic Auth
+    auth_basic "Restricted Area";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+
+    # Optional: log hits
+    access_log /var/log/nginx/access.log main;
+}
+```
+
+---
+
+### How it works
+
+1. If someone from an unauthorized IP tries → they get **403 Forbidden**.
+2. If someone from an allowed IP tries:
+
+   * They see a **username/password popup**.
+   * Must enter `admin / StrongPassword123`.
+   * If correct → NGINX shows the stub\_status page.
+3. Access attempts are logged in `/var/log/nginx/access.log`.
+
+---
+
+### Example Flow
+
+#### Correct client (127.0.0.1)
+
+```bash
+curl -u admin:StrongPassword123 http://127.0.0.1/nginx_status
+```
+
+Output:
+
+```
+Active connections: 3
+server accepts handled requests
+ 1042 1042 1094
+Reading: 0 Writing: 1 Waiting: 2
+```
+
+### Wrong password
+
+```bash
+curl -u admin:wrong http://127.0.0.1/nginx_status
+```
+
+Output:
+
+```
+401 Authorization Required
+```
+
+### Unauthorized IP
+
+```bash
+curl http://203.0.113.50/nginx_status
+```
+
+Output:
+
+```
+403 Forbidden
+```
+
+---
+
+> This way `/nginx_status` is protected by **two layers**:
+
+* **IP filtering** (only trusted networks allowed)
+* **Basic auth** (username/password gate)
+    
+</details>
 
 ---
