@@ -1918,14 +1918,24 @@ You want to:
 
 ```nginx
 http {
+    ##
+    ## 1. Define upstream with "zone" for per-peer stats
+    ##
     upstream backend {
-        zone http_backend 64k;             # shared memory zone for stats
+        zone http_backend 64k;                 # enables upstream metrics (→ "upstreams" in JSON)
         server backend1.example.com weight=5;
         server backend2.example.com;
     }
 
-    proxy_cache_path /data/nginx/cache_backend keys_zone=cache_backend:10m;
+    ##
+    ## 2. Define cache path with "keys_zone" for cache stats
+    ##
+    proxy_cache_path /data/nginx/cache_backend keys_zone=cache_backend:10m; 
+    # enables cache metrics (→ "caches" in JSON)
 
+    ##
+    ## 3. Main server that uses upstream and cache
+    ##
     server {
         listen 80;
         server_name api.example.com;
@@ -1933,23 +1943,24 @@ http {
         location / {
             proxy_pass http://backend;
             proxy_cache cache_backend;
-            health_check;
+            health_check;                      # enables health check info in upstream stats
         }
 
-        # Collect stats for this server
-        status_zone server_backend;
+        status_zone server_backend;            # enables per-server stats (→ "server_zones" in JSON)
     }
 
-    # Monitoring endpoint (internal or restricted)
+    ##
+    ## 4. Monitoring endpoint
+    ##
     server {
         listen 127.0.0.1;
 
         location /status {
-            status;                       # enable status endpoint
-            status_format json;           # output JSON
+            status;                            # enable status
+            status_format json;                # JSON format (machine-readable)
         }
 
-        location = /status.html { }
+        location = /status.html { }            # optional HTML page for simple view
     }
 }
 ```
@@ -1968,57 +1979,75 @@ You get JSON like:
 
 ```json
 {
-  "version": 8,
-  "nginx_version": "1.25.3",
-  "connections": {
-    "accepted": 5000,
-    "dropped": 10,
-    "active": 120,
-    "idle": 20
+  "version": 8,                          ##--> Format version of the status JSON (used by monitoring tools to parse correctly), From status module itself
+  "nginx_version": "1.25.3",             ##--> Version of NGINX running
+  "connections": {                     ## From NGINX core
+    "accepted": 5000,                    ##--> Total number of TCP connections accepted by NGINX since start
+    "dropped": 10,                       ##--> Connections dropped (e.g., resource limits, overload)
+    "active": 120,                       ##--> Currently open/active client connections
+    "idle": 20                           ##--> Connections that are open but not currently sending requests
   },
-  "requests": {
-    "total": 20000,
-    "current": 15
+  "requests": {                        ## From NGINX core
+    "total": 20000,                      ##--> Total number of HTTP requests handled since start
+    "current": 15                         ##--> Number of requests currently being processed at this moment
   },
-  "server_zones": {
+  "server_zones": {                    ## Because of "status_zone server_backend;"
     "server_backend": {
-      "processing": 5,
-      "requests": 15000,
+      "processing": 5,                   ##--> Requests currently being handled by this server zone
+      "requests": 15000,                 ##--> Total requests received for this server block
       "responses": {
-        "total": 15000,
-        "2xx": 14000,
-        "4xx": 500,
-        "5xx": 500
+        "total": 15000,                  ##--> Total number of responses sent to clients
+        "2xx": 14000,                    ##--> Successful responses (status codes 200–299)
+        "4xx": 500,                      ##--> Client error responses (e.g., 404, 403, 400)
+        "5xx": 500                       ##--> Server error responses (e.g., 500, 502, 504)
       },
-      "received": 12345678,
-      "sent": 98765432
+      "received": 12345678,              ##--> Total bytes received from clients (uploads, request bodies)
+      "sent": 98765432                   ##--> Total bytes sent to clients (responses, files, etc.)
     }
   },
-  "upstreams": {
+  "upstreams": {                       ## Because of "zone http_backend 64k;" in upstream
     "backend": {
       "peers": [
         {
-          "id": 1,
-          "server": "backend1.example.com",
-          "state": "up",
-          "active": 10,
-          "requests": 8000,
-          "responses": { "2xx": 7800, "5xx": 200 },
-          "fails": 5
+          "id": 1,                       ##--> ID of the upstream peer (unique identifier)
+          "server": "backend1.example.com", ##--> Upstream server address
+          "state": "up",                 ##--> Current health status (up, down, unhealthy, etc.)
+          "active": 10,                  ##--> Active (ongoing) requests currently being handled by this peer
+          "requests": 8000,              ##--> Total requests forwarded to this peer since NGINX started
+          "responses": { 
+            "2xx": 7800,                 ##--> Number of successful responses returned by this peer
+            "5xx": 200                   ##--> Number of server error responses returned by this peer
+          },
+          "fails": 5                     ##--> Failed attempts to connect or communicate with this peer
         },
         {
           "id": 2,
           "server": "backend2.example.com",
           "state": "up",
           "active": 5,
-          "requests": 7000,
-          "responses": { "2xx": 6900, "5xx": 100 },
-          "fails": 3
+          "requests": 7000,              ##--> Total requests sent to this peer (counts every request routed here)
+          "responses": { 
+            "2xx": 6900,                 ##--> Successful responses returned by this peer
+            "5xx": 100                   ##--> Server-side errors returned by this peer
+          },
+          "fails": 3                     ##--> Number of failed connection attempts or retries for this peer
         }
       ]
     }
+  },
+
+"caches": {                          ## Because of "proxy_cache_path ... keys_zone=cache_backend"
+    "cache_backend": {
+      "size": 1234567,                  ## Current size of cache
+      "max_size": 10485760,             ## Max allowed size (10m)
+      "cold": false,                    ## If cache loader still initializing
+      "hit": { "responses": 5000, "bytes": 10000000 },
+      "miss": { "responses": 2000, "bytes": 4000000 },
+      "expired": { "responses": 100, "bytes": 20000 }
+    }
   }
 }
+
 ```
 
 ---
