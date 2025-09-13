@@ -1372,7 +1372,8 @@ Response:
 
   > This is how we plug JWT validation into OSS NGINX.
 
----
+<details>
+    <summary>Click to view Examples and Uses</summary>
 
 ### Example from docs
 
@@ -1437,10 +1438,10 @@ This is powerful: you can pass **user\_id, roles, claims** from the JWT validato
   * **`ngx_http_auth_basic_module`** (username/password)
   * **satisfy directive** (e.g., allow if *either* IP or JWT is valid).
 
----
-
 > So in simple terms:
 * `auth_request` = **NGINX asks another service if request is allowed**.
 * `auth_request_set` = **grab details from that answer and pass to backend**.
+
+</details>
 
 ---
