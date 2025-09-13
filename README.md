@@ -1620,3 +1620,7 @@ curl -H "Authorization: Bearer badtoken" http://localhost/api/hello
   * *No (401)* → NGINX stops it.
     
 </details>
+
+---
+
+## Module `ngx_http_auth_require_module`
