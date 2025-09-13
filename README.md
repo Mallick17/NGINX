@@ -803,3 +803,78 @@ server {
 ---
 
 ## Module `ngx_http_auth_basic_module`
+It lets you **protect a page or a whole site with a username and password**.
+
+* The browser will pop up a login box 🪪
+* The user must enter the correct username + password before they can see the page.
+* This is called **HTTP Basic Authentication**.
+
+---
+
+## Example Configuration
+
+```nginx
+location / {
+    auth_basic "closed site";
+    auth_basic_user_file conf/htpasswd;
+}
+```
+
+* `auth_basic "closed site";` → Enables the login prompt.
+
+  * `"closed site"` is the *realm* → it’s just the message that shows in the login popup.
+* `auth_basic_user_file conf/htpasswd;` → The file where valid usernames and passwords are stored.
+
+---
+
+## Example of the password file (`conf/htpasswd`)
+
+```
+# comment line
+alice:$apr1$ajf92sl.$X9ZcL8zj1fP0J8hiUZkS/
+bob:$apr1$98fh29s.$kZpTjUq2IefB3R5hNQkty0
+```
+
+* `alice` and `bob` are usernames.
+* The long string is the encrypted password.
+* This file can be created with tools like:
+
+  * `htpasswd` (from Apache utils)
+  * `openssl passwd -apr1`
+
+---
+
+## How it looks to the user
+
+1. User opens `http://example.com/`.
+2. Browser shows a popup:
+
+   ```
+   Authentication Required
+   Username: [   ]
+   Password: [   ]
+   ```
+3. If user enters `alice` + correct password → access granted.
+4. If wrong → NGINX returns `401 Unauthorized`.
+
+---
+
+## When it’s useful
+
+* Protecting **admin panels** or **test environments**.
+* Quickly securing a site without adding login logic in the app.
+* Restricting **internal dashboards** (like `/nginx_status`).
+* Adding an extra layer of protection before exposing something sensitive.
+
+---
+
+## Security Notes
+
+* Passwords are **hashed** in the `htpasswd` file (not plain text).
+* Avoid using SHA-1 (`SHA`, `SSHA`) because it’s weak. Use **MD5 (`apr1`)** or **bcrypt (via Apache htpasswd with `-B`)**.
+* Use HTTPS when enabling basic auth, otherwise credentials are sent as plain text over the network.
+
+> _In short:_
+> `ngx_http_auth_basic_module` = **simple password gate** you can put in front of any location in NGINX.
+
+---
