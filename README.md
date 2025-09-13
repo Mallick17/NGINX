@@ -617,17 +617,15 @@ The `ngx_http_stub_status_module` is a simple yet powerful tool for live monitor
 ---
 
 ## Module `ngx_http_addition_module`
-
-### What it does
-
-The `ngx_http_addition_module` lets you tell NGINX:
+The ngx_http_addition_module module is a filter that adds text before and after a response. This module is not built by default, it should be enabled with the --with-http_addition_module configuration parameter.
 
 * “Before sending the normal response body, insert the response from `/before_action`.”
 * “After sending the normal response body, append the response from `/after_action`.”
 
 So NGINX will make **subrequests** to those URIs (or files) and include their responses inline.
 
----
+<details>
+    <summary>Click to view the Example and How to Use</summary>
 
 ### Example Configuration
 
@@ -700,6 +698,105 @@ Main page content here
 * It does **not** parse or understand HTML/JSON — it just blindly appends text.
 * If you use it with APIs (JSON/XML), it will usually break clients unless they’re designed to handle extra text.
 * **Best suited for HTML responses** where you want to inject banners, notices, or wrappers at the NGINX level.
+
+<details>
+    <summary>Real Life Scenario</summary>
+
+### Scenario
+
+You want to show a **“Maintenance Notice”** on top of every web page **without touching your Laravel/Swoole app**.
+
+---
+
+### NGINX Config Example
+
+```nginx
+server {
+    listen 80;
+    server_name myapp.local;
+
+    root /var/www/html/public;
+
+    # Main application
+    location / {
+        add_before_body /maintenance_notice;
+        add_after_body  /footer_notice;
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    # Maintenance banner (prepended to all responses)
+    location /maintenance_notice {
+        default_type text/html;
+        return 200 "<div style='background:red;color:white;padding:10px;text-align:center;'>
+                      🚧 Maintenance ongoing: some features may be unavailable 🚧
+                    </div>";
+    }
+
+    # Footer banner (appended to all responses)
+    location /footer_notice {
+        default_type text/html;
+        return 200 "<div style='background:#333;color:#ccc;padding:10px;text-align:center;'>
+                      © 2025 My Company – All Rights Reserved
+                    </div>";
+    }
+}
+```
+
+---
+
+### What Happens
+
+#### Original App Response (`/`)
+
+```html
+<html>
+<body>
+<h1>Welcome to My App</h1>
+<p>Main content goes here.</p>
+</body>
+</html>
+```
+
+#### Modified Response with `ngx_http_addition_module`
+
+```html
+<div style='background:red;color:white;padding:10px;text-align:center;'>
+  🚧 Maintenance ongoing: some features may be unavailable 🚧
+</div>
+
+<html>
+<body>
+<h1>Welcome to My App</h1>
+<p>Main content goes here.</p>
+</body>
+</html>
+
+<div style='background:#333;color:#ccc;padding:10px;text-align:center;'>
+  © 2025 My Company – All Rights Reserved
+</div>
+```
+
+---
+
+### Why It’s Useful
+
+* **Zero code changes** in your app.
+* Can be **enabled/disabled quickly** at the NGINX layer.
+* Works for **all requests** (HTML responses).
+* Great for banners, warnings, or compliance notices.
+
+---
+
+### Limitations
+
+* Don’t use for **JSON APIs** → extra HTML will break clients.
+* Subrequests (`/maintenance_notice`, `/footer_notice`) are full NGINX requests → avoid making them heavy.
+* Best suited for **HTML websites**, not REST/GraphQL APIs.
+* This gives you a fast, reversible way to **inject messages** into every page served by NGINX.
+   
+</details>
+
+</details>
 
 ---
 
