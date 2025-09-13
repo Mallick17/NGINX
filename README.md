@@ -983,4 +983,98 @@ Output:
     
 </details>
 
+<details>
+    <summary>Supported Password Types</summary>
+
+## Supported password types
+### Password file basics
+
+* The file (`htpasswd`) holds usernames and passwords.
+* Each line looks like:
+
+  ```
+  username:encrypted_password[:comment]
+  ```
+* NGINX checks the password the user enters against the encrypted value in the file.
+
+---
+
+### Supported password types
+
+1. **crypt() function (traditional UNIX crypt)**
+
+   * Oldest method.
+   * Example entry:
+
+     ```
+     alice:SaQYwJz6hG0wQ
+     ```
+   * Generated using:
+
+     ```bash
+     openssl passwd mypassword
+     ```
+   * Not recommended today (weak).
+
+---
+
+2. **Apache MD5 (`apr1`)**
+
+   * Safer than plain `crypt`.
+   * Example entry:
+
+     ```
+     bob:$apr1$1d9a7dC2$7DXMcKbnY4Qo1r4CuYxvL.
+     ```
+   * Generated using:
+
+     ```bash
+     htpasswd -m /etc/nginx/.htpasswd bob
+     # or
+     openssl passwd -apr1 "mypassword"
+     ```
+   *  Commonly used and supported.
+
+3. **RFC 2307 style → `{scheme}data`**
+
+   * Format: `{SCHEME}encoded_password`
+   * Schemes supported in NGINX:
+
+     * **PLAIN** → `{PLAIN}mypassword` (⚠️ never use, password is cleartext).
+     * **SHA** → `{SHA}base64_of_sha1(password)` (⚠️ unsafe, unsalted SHA-1).
+     * **SSHA** → `{SSHA}base64_of_sha1(password+salt)` (slightly better, used in LDAP/Dovecot).
+
+   Example (SHA-1 hashed):
+
+   ```
+   carol:{SHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g=
+   ```
+
+---
+
+### Security Notes
+
+* **Best today:**
+
+  * Use **MD5-apr1 (`-m`)** or **bcrypt (`-B`)** if your `htpasswd` tool supports it.
+  * Example bcrypt entry:
+
+    ```
+    david:$2y$05$zA5O4/Ph3EZ/CMECnM8Xe.3tC8zJ5o4kOt/yHcSvTj5R3AN/uzqZW
+    ```
+* **Avoid:**
+
+  * PLAIN (obvious reasons)
+  * SHA (unsalted SHA-1, easily cracked with rainbow tables)
+
+---
+
+> So in simple terms:
+
+* You can use `htpasswd` or `openssl passwd` to create these entries.
+* NGINX supports **crypt, apr1-MD5, SHA/SSHA, and RFC 2307-style formats**.
+* For modern security, stick with **apr1-MD5** or **bcrypt**.
+    
+</details>
+
 ---
