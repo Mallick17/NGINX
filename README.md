@@ -2403,4 +2403,134 @@ curl "http://127.0.0.1/upstream_conf?remove=&upstream=backend&id=2"
 
 ---
 
-## 
+## Module `ngx_stream_core_module`
+
+* It allows NGINX to work as a **TCP/UDP proxy and load balancer** (not just HTTP).
+* Think:
+
+  * HTTP module → for websites, APIs, web traffic.
+  * STREAM module → for raw TCP/UDP protocols (databases, DNS, MQTT, SMTP, Redis, custom TCP services).
+
+> It’s not built by default, you need to compile NGINX with `--with-stream`.
+
+---
+
+### Example Use Cases
+
+1. **MySQL Load Balancing**
+
+   ```nginx
+   stream {
+       upstream mysql_backend {
+           server db1.example.com:3306;
+           server db2.example.com:3306;
+       }
+
+       server {
+           listen 3306;
+           proxy_pass mysql_backend;
+       }
+   }
+   ```
+
+   > Clients connect to `NGINX:3306`, and NGINX load balances traffic between `db1` and `db2`.
+
+---
+
+2. **DNS over UDP**
+
+   ```nginx
+   stream {
+       upstream dns_cluster {
+           server 8.8.8.8:53;
+           server 1.1.1.1:53;
+       }
+
+       server {
+           listen 53 udp reuseport;
+           proxy_timeout 20s;
+           proxy_pass dns_cluster;
+       }
+   }
+   ```
+
+   > NGINX acts as a DNS proxy/load balancer.
+
+---
+
+3. **TLS Termination + Proxying**
+
+   ```nginx
+   stream {
+       server {
+           listen 443 ssl;
+           proxy_pass backend_tls;
+           ssl_certificate /etc/nginx/certs/server.crt;
+           ssl_certificate_key /etc/nginx/certs/server.key;
+       }
+   }
+   ```
+
+   > Works for raw TLS (e.g., mail servers, custom protocols).
+
+---
+
+### Key Directives in `ngx_stream_core_module`
+
+* **`listen`** – Define the port & address where NGINX listens for TCP/UDP.
+* **`upstream`** – Define a group of backend servers.
+* **`proxy_pass`** – Forward traffic to upstream.
+* **`preread_buffer_size` / `preread_timeout`** – Buffer & timeout for reading first packet (useful for protocol inspection).
+* **`resolver` / `resolver_timeout`** – DNS resolving for backend servers.
+* **`tcp_nodelay`** – Control TCP\_NODELAY (affects latency vs throughput tradeoff).
+
+---
+
+### Embedded Variables for Logs (Important for Debugging)
+
+You can log TCP/UDP traffic like this:
+
+```nginx
+log_format streamlog '$remote_addr:$remote_port -> $server_addr:$server_port '
+                     'status=$status bytes_in=$bytes_received bytes_out=$bytes_sent '
+                     'protocol=$protocol time=$session_time';
+
+stream {
+    upstream backend {
+        server 10.0.0.10:8080;
+        server 10.0.0.11:8080;
+    }
+
+    server {
+        listen 8080;
+        proxy_pass backend;
+        access_log /var/log/nginx/stream_access.log streamlog;
+    }
+}
+```
+
+📄 Example log entry:
+
+```
+192.168.1.5:54321 -> 10.0.0.10:8080 status=200 bytes_in=150 bytes_out=1200 protocol=TCP time=1.234
+```
+
+* `$remote_addr:$remote_port` → client info
+* `$server_addr:$server_port` → which NGINX server handled it
+* `status=200` → TCP session completed ok
+* `bytes_in / bytes_out` → traffic stats
+* `protocol` → TCP or UDP
+* `time` → how long the session lasted
+
+---
+
+### Big Picture
+
+* `ngx_http_upstream_module` → HTTP load balancing
+* `ngx_http_upstream_conf_module` → dynamic upstream reconfiguration (NGINX Plus)
+* `ngx_stream_core_module` → TCP/UDP load balancing
+
+> Together, they let NGINX handle **any kind of traffic** — web, API, DB, DNS, or custom protocol.
+
+
+---
